@@ -5,7 +5,7 @@ defmodule Quagga.MixProject do
     [
       app: :quagga,
       version: "0.1.0",
-      elixir: "~> 1.13",
+      elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
@@ -14,7 +14,7 @@ defmodule Quagga.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :baby, :inets],
       mod: {Quagga.Application, []}
     ]
   end
@@ -22,7 +22,7 @@ defmodule Quagga.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:baby, git: "git@github.com:mwmiller/baby_ex.git"}
+      {:baby, git: "https://matt_miller@bitbucket.org/matt_miller/baby_ex.git"}
     ]
   end
 end

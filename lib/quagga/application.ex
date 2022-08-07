@@ -12,6 +12,11 @@ defmodule Quagga.Application do
       # {Quagga.Worker, arg}
     ]
 
+    Baobab.create_identity("fly")
+    started = "Etc/UTC" |> DateTime.now!() |> DateTime.to_string()
+
+    Baobab.append_log("Fly BABY instance from " <> started, "fly", log_id: 8483)
+
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Quagga.Supervisor]

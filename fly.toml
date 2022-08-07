@@ -1,0 +1,23 @@
+app = "quagga"
+
+kill_signal = "SIGTERM"
+kill_timeout = 5
+
+[env]
+
+[[services]]
+  internal_port = 8483
+  protocol = "tcp"
+
+  [services.concurrency]
+    hard_limit = 25
+    soft_limit = 20
+
+  [[services.ports]]
+    port = 8483
+
+  [[services.tcp_checks]]
+    grace_period = "30s" # allow some time for startup
+    interval = "15s"
+    restart_limit = 6
+    timeout = "2s"
