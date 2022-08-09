@@ -7,6 +7,7 @@ defmodule Quagga.MixProject do
       version: "0.1.0",
       elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
+      releases: releases(),
       deps: deps()
     ]
   end
@@ -16,6 +17,15 @@ defmodule Quagga.MixProject do
     [
       extra_applications: [:logger, :baby, :inets],
       mod: {Quagga.Application, []}
+    ]
+  end
+
+  defp releases() do
+    [
+      quagga: [
+        include_executables_for: [:unix],
+        cookie: "KE-AGO-RATA"
+      ]
     ]
   end
 
