@@ -7,4 +7,5 @@ config :baobab,
 
 config :baby,
   identity: "fly",
-  port: 8483
+  port: 8483,
+  cryouts: []
