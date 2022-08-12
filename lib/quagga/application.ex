@@ -13,9 +13,16 @@ defmodule Quagga.Application do
     ]
 
     Baobab.create_identity("fly")
-    started = "Etc/UTC" |> DateTime.now!() |> DateTime.to_string()
 
-    Baobab.append_log("Fly BABY instance from " <> started, "fly", log_id: 8483)
+    case Application.get_env(:quagga, :public) do
+      nil ->
+        :ok
+
+      map ->
+        Map.merge(map, %{"start" => "Etc/UTC" |> DateTime.now!() |> DateTime.to_string()})
+        |> CBOR.encode()
+        |> Baobab.append_log("fly", log_id: 8483)
+    end
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
