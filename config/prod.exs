@@ -7,5 +7,6 @@ config :baobab,
 
 config :baby,
   identity: "fly",
+  clump_id: "Quagga",
   port: 8483,
   cryouts: [[host: "moid2.fly.dev", port: 8483, period: {2, :hour}]]
