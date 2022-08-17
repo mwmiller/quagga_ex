@@ -1,8 +1,5 @@
 import Config
 
-config :baobab,
-  spool_dir: "/tmp/baobab"
-
-config :baby,
-  identity: "fly",
-  port: 8483
+config :quagga,
+  public: %{"name" => "Zebra Homebase", "host" => "quagga.nftease.online", "port" => 8483},
+  secret: System.get_env("QUAGGA_SECRET_KEY")

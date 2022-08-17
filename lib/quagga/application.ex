@@ -8,21 +8,9 @@ defmodule Quagga.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      # Starts a worker by calling: Quagga.Worker.start_link(arg)
-      # {Quagga.Worker, arg}
+      {Quagga.Nicker,
+       [Application.get_env(:quagga, :secret), Application.get_env(:quagga, :public)]}
     ]
-
-    Baobab.create_identity("fly")
-
-    case Application.get_env(:quagga, :public) do
-      nil ->
-        :ok
-
-      map ->
-        Map.merge(map, %{"start" => "Etc/UTC" |> DateTime.now!() |> DateTime.to_string()})
-        |> CBOR.encode()
-        |> Baobab.append_log("fly", log_id: 8483)
-    end
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
