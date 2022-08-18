@@ -6,7 +6,6 @@ defmodule Quagga.Nicker do
   @gossip_wait 179_969
   @announce_freq 86_399_981
 
-  @impl true
   def start_link(args) when is_list(args) do
     GenServer.start_link(__MODULE__, args)
   end
