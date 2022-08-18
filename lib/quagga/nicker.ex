@@ -3,8 +3,8 @@ defmodule Quagga.Nicker do
   The public greeting announcement of a Quagga instance
   """
   use GenServer
-  @gossip_wait 9901
-  @announce_freq 3_600_013
+  @gossip_wait 179_969
+  @announce_freq 86_399_981
 
   @impl true
   def start_link(args) when is_list(args) do
