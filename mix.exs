@@ -32,7 +32,7 @@ defmodule Quagga.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:baby, git: "https://matt_miller@bitbucket.org/matt_miller/baby_ex.git"}
+      {:baby, git: "https://github.com/mwmiller/baby_ex"}
     ]
   end
 end
