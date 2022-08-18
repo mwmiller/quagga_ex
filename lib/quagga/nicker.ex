@@ -3,6 +3,7 @@ defmodule Quagga.Nicker do
   The public greeting announcement of a Quagga instance
   """
   use GenServer
+  @nicker_log_id 8483
   @gossip_wait 179_969
   @announce_freq 86_399_981
 
@@ -31,7 +32,7 @@ defmodule Quagga.Nicker do
   def handle_info(:announce, state) when map_size(state) == 0, do: {:noreply, state}
 
   def handle_info(:announce, %{:wait_for_log => pub} = state) do
-    case Baobab.max_seqnum(pub, log_id: 8483) do
+    case Baobab.max_seqnum(pub, log_id: @nicker_log_id) do
       0 ->
         Process.send_after(self(), :announce, @gossip_wait, [])
         {:noreply, state}
@@ -46,7 +47,7 @@ defmodule Quagga.Nicker do
     state
     |> Map.merge(%{"running" => "Etc/UTC" |> DateTime.now!() |> DateTime.to_string()})
     |> CBOR.encode()
-    |> Baobab.append_log(Application.get_env(:baby, :identity), log_id: 8483)
+    |> Baobab.append_log(Application.get_env(:baby, :identity), log_id: @nicker_log_id)
 
     Process.send_after(self(), :announce, @announce_freq)
     {:noreply, state}
