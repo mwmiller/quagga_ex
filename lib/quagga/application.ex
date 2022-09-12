@@ -8,6 +8,7 @@ defmodule Quagga.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      {Baby.Application, []},
       {Quagga.Nicker,
        [Application.get_env(:quagga, :secret), Application.get_env(:quagga, :public)]}
     ]
