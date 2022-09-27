@@ -31,8 +31,8 @@ defmodule Quagga.Nicker do
   @impl true
   def handle_info(:announce, state) when map_size(state) == 0, do: {:noreply, state}
 
-  def handle_info(:announce, %{:wait_for_log => pub} = state) do
-    case Baobab.max_seqnum(pub, log_id: @nicker_log_id) do
+  def handle_info(:announce, %{:wait_for_log => pub, "clump_id" => clump_id} = state) do
+    case Baobab.max_seqnum(pub, log_id: @nicker_log_id, clump_id: clump_id) do
       0 ->
         Process.send_after(self(), :announce, @gossip_wait, [])
         {:noreply, state}
@@ -43,11 +43,14 @@ defmodule Quagga.Nicker do
     end
   end
 
-  def handle_info(:announce, state) do
+  def handle_info(:announce, %{"clump_id" => clump_id} = state) do
     state
     |> Map.merge(%{"running" => "Etc/UTC" |> DateTime.now!() |> DateTime.to_string()})
     |> CBOR.encode()
-    |> Baobab.append_log(Application.get_env(:baby, :identity), log_id: @nicker_log_id)
+    |> Baobab.append_log(Application.get_env(:baby, :identity),
+      log_id: @nicker_log_id,
+      clump_id: clump_id
+    )
 
     Process.send_after(self(), :announce, @announce_freq)
     {:noreply, state}
