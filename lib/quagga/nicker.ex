@@ -3,6 +3,7 @@ defmodule Quagga.Nicker do
   The public greeting announcement of a Quagga instance
   """
   use GenServer
+  require Logger
   @gossip_wait 179_969
   @announce_freq 86_399_981
 
@@ -12,12 +13,13 @@ defmodule Quagga.Nicker do
 
   @impl true
   def init(clump_def) do
+    id = Keyword.get(clump_def, :controlling_identity)
     sk = Keyword.get(clump_def, :controlling_secret)
 
     pub =
       case sk do
-        nil -> Baobab.create_identity(Keyword.get(clump_def, :controlling_identity))
-        secret -> Baobab.create_identity(Keyword.get(clump_def, :controlling_identity), secret)
+        nil -> Baobab.create_identity(id)
+        secret -> Baobab.create_identity(id, secret)
       end
 
     state =
@@ -31,6 +33,7 @@ defmodule Quagga.Nicker do
 
     {:ok,
      Map.merge(state, %{
+       "identity" => id,
        "clump_id" => Keyword.get(clump_def, :id),
        "port" => Keyword.get(clump_def, :port)
      })}
@@ -53,14 +56,17 @@ defmodule Quagga.Nicker do
     end
   end
 
-  def handle_info(:announce, %{"clump_id" => clump_id, "nicker_log_id" => nli} = state) do
+  def handle_info(
+        :announce,
+        %{"identity" => id, "clump_id" => clump_id, "nicker_log_id" => nli} = state
+      ) do
     state
+    |> Map.drop(["identity", "nicker_log_id"])
     |> Map.merge(%{"running" => "Etc/UTC" |> DateTime.now!() |> DateTime.to_string()})
     |> CBOR.encode()
-    |> Baobab.append_log(Application.get_env(:baby, :identity),
-      log_id: nli,
-      clump_id: clump_id
-    )
+    |> Baobab.append_log(id, log_id: nli, clump_id: clump_id)
+
+    Logger.info("Logged public announcement")
 
     Process.send_after(self(), :announce, @announce_freq)
     {:noreply, state}
