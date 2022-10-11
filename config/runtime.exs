@@ -1,17 +1,10 @@
 import Config
 
-config :quagga,
-  public: %{
-    "name" => "Zebra Homebase",
-    "host" => "quagga.nftease.online",
-    "port" => 8483,
-    "clump_id" => "Quagga"
-  },
-  secret: System.get_env("QUAGGA_SECRET_KEY")
-
 config :logger, level: :info
 
-config :baby,
+# Be sure that all defined ports are properly mapped in the
+# Dockerfile.
+config :quagga,
   spool_dir: "/tmp/baobab",
   clumps: [
     [
@@ -19,6 +12,11 @@ config :baby,
       controlling_identity: "fly",
       controlling_secret: System.get_env("QUAGGA_SECRET_KEY"),
       port: 8483,
-      cryouts: [[host: "moid2.fly.dev", port: 8483, period: {2, :hour}]]
+      cryouts: [[host: "moid2.fly.dev", port: 8483, period: {23, :minute}]],
+      public: %{
+        "name" => "Quagga Homebase",
+        "host" => "quagga.nftease.online",
+        "nicker_log_id" => 8483
+      }
     ]
   ]
