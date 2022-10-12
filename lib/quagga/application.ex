@@ -28,16 +28,14 @@ defmodule Quagga.Application do
       id: String.to_atom("baby_application_" <> Keyword.get(clump_def, :id)),
       start: {Baby.Application, :start, [nil, [{:spool_dir, spool_dir} | clump_def]]},
       type: :worker,
-      restart: :permanent,
-      shutdown: 500
+      restart: :permanent
     }
 
     nicker = %{
       id: String.to_atom("quagga_nicker_" <> Keyword.get(clump_def, :id)),
       start: {Quagga.Nicker, :start_link, [clump_def]},
       type: :worker,
-      restart: :permanent,
-      shutdown: 500
+      restart: :permanent
     }
 
     define_babies(rest, spool_dir, acc ++ [listener, nicker])
