@@ -31,9 +31,12 @@ defmodule Quagga.Nicker do
 
     Process.send_after(self(), :announce, @gossip_wait, [])
 
+    facet_id = Map.get(state, "facet_id", 0)
+
     {:ok,
      Map.merge(state, %{
        "identity" => id,
+       "nicker_log_id" => QuaggaDef.facet_log(:oasis, facet_id),
        "clump_id" => Keyword.get(clump_def, :id),
        "port" => Keyword.get(clump_def, :port)
      })}

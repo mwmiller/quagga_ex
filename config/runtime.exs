@@ -14,9 +14,8 @@ config :quagga,
       port: 8483,
       cryouts: [[host: "moid2.fly.dev", port: 8483, period: {23, :minute}]],
       public: %{
-        "name" => "Quagga Homebase",
-        "host" => "quagga.nftease.online",
-        "nicker_log_id" => 8483
+        "name" => "Quagga ORD",
+        "host" => "quagga.nftease.online"
       }
     ]
   ]
