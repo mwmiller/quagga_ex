@@ -5,15 +5,10 @@ defmodule Quagga.Application do
 
   @impl true
   def start(_type, _args) do
-    path = Application.get_env(:quagga, :spool_dir, "/tmp/baobab") |> Path.expand()
-    File.mkdir_p(path)
+    config = Application.get_all_env(:quagga)
 
-    babies =
-      define_babies(
-        Application.get_env(:quagga, :clumps, []),
-        path,
-        []
-      )
+    nickers = define_nickers(Keyword.get(config, :clumps), [])
+    babies = [{Baby.Application, config}] ++ nickers
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
@@ -21,16 +16,9 @@ defmodule Quagga.Application do
     Supervisor.start_link(babies, opts)
   end
 
-  defp define_babies([], _, acc), do: acc
+  defp define_nickers([], acc), do: acc
 
-  defp define_babies([clump_def | rest], spool_dir, acc) do
-    listener = %{
-      id: String.to_atom("baby_application_" <> Keyword.get(clump_def, :id)),
-      start: {Baby.Application, :start, [nil, [{:spool_dir, spool_dir} | clump_def]]},
-      type: :worker,
-      restart: :permanent
-    }
-
+  defp define_nickers([clump_def | rest], acc) do
     nicker = %{
       id: String.to_atom("quagga_nicker_" <> Keyword.get(clump_def, :id)),
       start: {Quagga.Nicker, :start_link, [clump_def]},
@@ -38,6 +26,6 @@ defmodule Quagga.Application do
       restart: :permanent
     }
 
-    define_babies(rest, spool_dir, acc ++ [listener, nicker])
+    define_nickers(rest, [nicker | acc])
   end
 end
