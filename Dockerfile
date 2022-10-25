@@ -4,7 +4,7 @@
 FROM hexpm/elixir:1.14.1-erlang-24.1-alpine-3.16.0 AS build
 
 # install build dependencies
-RUN apk add --no-cache build-base git
+RUN apk add --no-cache build-base git libsodium libsodium-dev
 
 # prepare build dir
 WORKDIR /app
@@ -57,7 +57,7 @@ RUN mix do compile, release
 
 # prepare release docker image
 FROM alpine:3.16.0 AS app
-RUN apk add --no-cache libstdc++ openssl ncurses-libs
+RUN apk add --no-cache libstdc++ openssl ncurses-libs libsodium
 
 WORKDIR /app
 
