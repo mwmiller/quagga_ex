@@ -16,17 +16,13 @@ defmodule Quagga.Nicker do
     id = Keyword.get(clump_def, :controlling_identity)
     sk = Keyword.get(clump_def, :controlling_secret)
 
-    pub =
-      case sk do
-        nil -> Baobab.create_identity(id)
-        secret -> Baobab.create_identity(id, secret)
-      end
+    pk = Baobab.Identity.create(id, sk)
 
     state =
       case {Keyword.get(clump_def, :public), sk} do
         {nil, _} -> %{}
         {map, nil} -> map
-        {map, _} -> Map.put(map, :wait_for_log, pub)
+        {map, _} -> Map.put(map, :wait_for_log, pk)
       end
 
     Process.send_after(self(), :announce, @gossip_wait, [])
