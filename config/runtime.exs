@@ -15,7 +15,7 @@ config :quagga,
       cryouts: [[host: "moid2.fly.dev", port: 8483, period: {23, :minute}]],
       public: %{
         "name" => "Quagga ORD",
-        "host" => "quagga.nftease.online"
+        "host" => "quagga.zebrine.net"
       }
     ]
   ]
