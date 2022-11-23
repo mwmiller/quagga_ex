@@ -32,7 +32,7 @@ defmodule Quagga.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:baby, git: "https://github.com/mwmiller/baby_ex"},
+      {:baby, "~> 0.6"},
       {:quagga_def, ">= 0.0.0"}
     ]
   end
