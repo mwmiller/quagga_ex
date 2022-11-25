@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -e
+git stash
+git fetch --prune origin
+git reset --hard origin/main
+git stash pop
+fly deploy
