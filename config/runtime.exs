@@ -12,6 +12,8 @@ config :quagga,
       controlling_identity: "fly",
       controlling_secret: System.get_env("QUAGGA_SECRET_KEY"),
       port: 8483,
+      announce_period: {23, :hour},
+      gossip_wait: {59, :minute},
       cryouts: [[host: "moid2.fly.dev", port: 8483, period: {23, :minute}]],
       public: %{
         "name" => "Quagga ORD",
