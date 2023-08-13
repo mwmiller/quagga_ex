@@ -8,7 +8,7 @@
 ##+Q 65536
 
 ## Tweak GC to run more often
-##-env ERL_FULLSWEEP_AFTER 10
+-env ERL_FULLSWEEP_AFTER 10
 
 ## Use the socket NIF inet_backend
 -kernel inet_backend socket
