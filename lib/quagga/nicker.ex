@@ -75,7 +75,7 @@ defmodule Quagga.Nicker do
 
     Logger.info("Logged public announcement: " <> name)
 
-    Process.send_after(self(), :announce, announce_freq)
+    Process.send_after(self(), :announce, announce_freq, [])
     {:noreply, state}
   end
 
