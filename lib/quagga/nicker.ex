@@ -11,6 +11,8 @@ defmodule Quagga.Nicker do
 
   @impl true
   def init(clump_def) do
+    cid = Keyword.get(clump_def, :id)
+    Logger.info("Nicker entering init: " <> cid)
     id = Keyword.get(clump_def, :controlling_identity)
     sk = Keyword.get(clump_def, :controlling_secret)
     pk = Baobab.Identity.create(id, sk)
@@ -35,6 +37,7 @@ defmodule Quagga.Nicker do
       })
 
     Process.send_after(self(), :announce, gossip_wait, [])
+    Logger.info("Nicker init complete -> gossip wait: " <> cid)
     {:ok, %{public: public, announce_freq: announce_freq, gossip_wait: gossip_wait}}
   end
 
@@ -47,13 +50,17 @@ defmodule Quagga.Nicker do
           public: %{:wait_for_log => pub, "clump_id" => clump_id, "nicker_log_id" => nli} = public
         } = state
       ) do
+    Logger.info("Nicker entering announce gossip wait: " <> clump_id)
+
     case Baobab.max_seqnum(pub, log_id: nli, clump_id: clump_id) do
       0 ->
         Process.send_after(self(), :announce, gossip_wait, [])
+        Logger.info("Nicker exiting announce ->  gossip wait: " <> clump_id)
         {:noreply, state}
 
       _ ->
         Process.send(self(), :announce, [])
+        Logger.info("Nicker exiting announce ->  ready: " <> clump_id)
         {:noreply, Map.merge(state, %{public: Map.drop(public, [:wait_for_log])})}
     end
   end
@@ -67,6 +74,8 @@ defmodule Quagga.Nicker do
               public
         } = state
       ) do
+    Logger.info("Nicker entering announce ready: " <> clump_id)
+
     public
     |> Map.drop(["identity", "nicker_log_id"])
     |> Map.merge(%{"running" => "Etc/UTC" |> DateTime.now!() |> DateTime.to_string()})
@@ -76,8 +85,13 @@ defmodule Quagga.Nicker do
     Logger.info("Logged public announcement: " <> name)
 
     Process.send_after(self(), :announce, announce_freq, [])
+    Logger.info("Nicker exiting announce ready -> announce_wait: " <> clump_id)
     {:noreply, state}
   end
 
-  def handle_info(:announce, state), do: {:noreply, state}
+  def handle_info(:announce, state) do
+    Logger.info("Nicker noop -> continue: ")
+    IO.inspect(state)
+    {:noreply, state}
+  end
 end
