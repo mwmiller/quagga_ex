@@ -14,7 +14,10 @@ config :quagga,
       port: 8483,
       announce_period: {23, :hour},
       gossip_wait: {59, :minute},
-      cryouts: [[host: "moid2.fly.dev", port: 8483, period: {23, :minute}]],
+      cryouts: [
+        [host: "moid2.fly.dev", port: 8483, period: {23, :minute}],
+        [host: "zebra.zebrine.net", port: 8483, period: {7, :minute}]
+      ],
       public: %{
         "name" => "Quagga ORD",
         "host" => "quagga.zebrine.net"
