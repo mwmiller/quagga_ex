@@ -4,7 +4,7 @@ defmodule Quagga.MixProject do
   def project do
     [
       app: :quagga,
-      version: "0.14.1",
+      version: "0.15.0",
       elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
       releases: releases(),
