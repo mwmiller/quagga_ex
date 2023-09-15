@@ -16,8 +16,10 @@ defmodule Quagga.Nicker do
     id = Keyword.get(clump_def, :controlling_identity)
     sk = Keyword.get(clump_def, :controlling_secret)
     pk = Baobab.Identity.create(id, sk)
-    gossip_wait = Keyword.get(clump_def, :gossip_wait, {19, :minute}) |> Baby.period_to_ms()
-    announce_freq = Keyword.get(clump_def, :announce_frew, {24, :hour}) |> Baby.period_to_ms()
+    gossip_wait = Keyword.get(clump_def, :gossip_wait, {19, :minute}) |> Baby.Util.period_to_ms()
+
+    announce_freq =
+      Keyword.get(clump_def, :announce_frew, {24, :hour}) |> Baby.Util.period_to_ms()
 
     pubset =
       case {Keyword.get(clump_def, :public), sk} do
