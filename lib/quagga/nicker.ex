@@ -11,40 +11,24 @@ defmodule Quagga.Nicker do
 
   @impl true
   def init(clump_def) do
-    cid = Keyword.get(clump_def, :id)
-    Logger.info("Nicker entering init: " <> cid)
-    id = Keyword.get(clump_def, :controlling_identity)
-    sk = Keyword.get(clump_def, :controlling_secret)
-    pk = Baobab.Identity.create(id, sk)
-    gossip_wait = Keyword.get(clump_def, :gossip_wait, {19, :minute}) |> Baby.Util.period_to_ms()
-
-    announce_freq =
-      Keyword.get(clump_def, :announce_frew, {24, :hour}) |> Baby.Util.period_to_ms()
-
-    pubset =
-      case {Keyword.get(clump_def, :public), sk} do
-        {nil, _} -> %{}
-        {map, nil} -> map
-        {map, _} -> Map.put(map, :wait_for_log, pk)
-      end
-
-    facet_id = Map.get(pubset, "facet_id", 0)
-
-    public =
-      Map.merge(pubset, %{
-        "identity" => id,
-        "nicker_log_id" => QuaggaDef.facet_log(:oasis, facet_id),
-        "clump_id" => Keyword.get(clump_def, :id),
-        "port" => Keyword.get(clump_def, :port)
-      })
-
-    Process.send_after(self(), :announce, gossip_wait, [])
-    Logger.info("Nicker init complete -> gossip wait: " <> cid)
-    {:ok, %{public: public, announce_freq: announce_freq, gossip_wait: gossip_wait}}
+    case Keyword.get(clump_def, :public) do
+      # Not set as public, drop out
+      nil -> {:stop, :normal}
+      pub -> {:ok, %{public: pub, clump_def: clump_def}, {:continue, :startup}}
+    end
   end
 
   @impl true
+  def handle_continue(:startup, %{public: pubset, clump_def: clump_def}) do
+    cd = unpack_clump_def(clump_def)
+    Logger.info("Nicker starting up: " <> cd[:cid])
+    public = fill_out_pubset(pubset, cd)
+    Process.send_after(self(), :announce, cd[:gw], [])
+    Logger.info("Nicker startup complete -> gossip wait: " <> cd[:cid])
+    {:noreply, %{public: public, announce_freq: cd[:af], gossip_wait: cd[:gw]}}
+  end
 
+  @impl true
   def handle_info(
         :announce,
         %{
@@ -93,7 +77,41 @@ defmodule Quagga.Nicker do
 
   def handle_info(:announce, state) do
     Logger.info("Nicker noop -> continue: ")
-    IO.inspect(state)
     {:noreply, state}
+  end
+
+  defp unpack_clump_def(clump_def) do
+    sk = Keyword.get(clump_def, :controlling_secret)
+    id = Keyword.get(clump_def, :controlling_identity)
+
+    %{
+      cid: Keyword.get(clump_def, :id),
+      port: Keyword.get(clump_def, :port),
+      id: id,
+      sk: sk,
+      op: Keyword.get(clump_def, :operator_key),
+      pk: Baobab.Identity.create(id, sk),
+      gw: Keyword.get(clump_def, :gossip_wait, {19, :minute}) |> Baby.Util.period_to_ms(),
+      af: Keyword.get(clump_def, :announce_freq, {24, :hour}) |> Baby.Util.period_to_ms()
+    }
+  end
+
+  defp fill_out_pubset(pubset, unpacked) do
+    facet_id = Map.get(pubset, "facet_id", 0)
+
+    pub =
+      pubset
+      |> Map.merge(%{
+        :wait_for_log => unpacked[:pk],
+        "identity" => unpacked[:id],
+        "nicker_log_id" => QuaggaDef.facet_log(:oasis, facet_id),
+        "clump_id" => unpacked[:cid],
+        "port" => unpacked[:port]
+      })
+
+    case unpacked[:op] do
+      nil -> pub
+      key -> Map.merge(pub, %{"operator" => key})
+    end
   end
 end
