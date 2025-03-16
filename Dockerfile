@@ -1,7 +1,7 @@
 ###
 ### Fist Stage - Building the Release
 ###
-FROM hexpm/elixir:1.15.5-erlang-26.0.2-alpine-3.18.2 AS build
+FROM hexpm/elixir:1.18.3-erlang-27.3-alpine-3.21.3 AS build
 
 # install build dependencies
 RUN apk add --no-cache build-base git libsodium libsodium-dev
@@ -56,7 +56,7 @@ RUN mix do compile, release
 ###
 
 # prepare release docker image
-FROM alpine:3.18.2 AS app
+FROM alpine:3.21.3 AS app
 RUN apk add --no-cache libstdc++ openssl ncurses-libs libsodium
 
 WORKDIR /app
