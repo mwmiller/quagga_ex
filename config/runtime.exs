@@ -5,10 +5,18 @@ import Config
 # `fly secrets set LOG_LEVEL=debug --app <app>` and redeploy.
 log_level =
   case System.get_env("LOG_LEVEL", "info") do
-    "debug" -> :debug
-    "info" -> :info
-    l when l in ~w(warning warn) -> :warning
-    "error" -> :error
+    "debug" ->
+      :debug
+
+    "info" ->
+      :info
+
+    l when l in ~w(warning warn) ->
+      :warning
+
+    "error" ->
+      :error
+
     other ->
       IO.warn("Unknown LOG_LEVEL #{inspect(other)}, defaulting to :info")
       :info
