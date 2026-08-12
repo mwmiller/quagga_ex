@@ -75,6 +75,26 @@ spool_dir =
 
 config :quagga, spool_dir: spool_dir
 
+# QUAGGA_FRESH_ANNOUNCE tells the Nicker whether this boot is a brand-new
+# identity or a recovered one, which determines how it avoids forking its own
+# oasis log.
+#
+# The oasis announcement is written under this node's own public key. On a
+# normal boot the local Baobab spool is empty, but peers may still hold this
+# node's *previous* oasis logs (replicated before the last restart). If the
+# node started writing its oasis at sequence number 1 before those old logs
+# came back, the late-arriving history would fork its log.
+#
+#   * set (any value) -> brand-new identity: no peer can possibly hold our logs
+#                yet, so it is safe to announce at sequence number 1 immediately.
+#                Set this ONLY on the first boot of a new identity/key, then
+#                unset it.
+#   * unset (default) -> recovered identity: the Nicker waits until our own
+#                oasis logs have been gossiped back from the network
+#                (max seqnum > 0) before continuing to write, which prevents a
+#                fork. This is the safe default.
+fresh_announce? = System.get_env("QUAGGA_FRESH_ANNOUNCE") != nil
+
 # Only run a clump in production so that local dev and test boots stay
 # side-effect free (no bound ports, no network cryouts).
 if config_env() == :prod do
@@ -90,6 +110,7 @@ if config_env() == :prod do
         port: 8483,
         announce_freq: {53, :hour},
         gossip_wait: {23, :minute},
+        fresh_announce: fresh_announce?,
         cryouts: node.cryouts,
         public: %{
           "name" => node.name,

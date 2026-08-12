@@ -25,7 +25,14 @@ defmodule Quagga.Nicker do
     public = fill_out_pubset(pubset, cd)
     Process.send_after(self(), :announce, cd[:gw], [])
     Logger.info("Nicker startup complete -> gossip wait: " <> cd[:cid])
-    {:noreply, %{public: public, announce_freq: cd[:af], gossip_wait: cd[:gw]}}
+
+    {:noreply,
+     %{
+       public: public,
+       announce_freq: cd[:af],
+       gossip_wait: cd[:gw],
+       fresh_announce: cd[:fresh]
+     }}
   end
 
   @impl true
@@ -33,21 +40,33 @@ defmodule Quagga.Nicker do
         :announce,
         %{
           gossip_wait: gossip_wait,
+          fresh_announce: fresh_announce,
           public: %{:wait_for_log => pub, "clump_id" => clump_id, "nicker_log_id" => nli} = public
         } = state
       ) do
     Logger.info("Nicker entering announce gossip wait: " <> clump_id)
 
-    case Baobab.max_seqnum(pub, log_id: nli, clump_id: clump_id) do
-      0 ->
-        Process.send_after(self(), :announce, gossip_wait, [])
-        Logger.info("Nicker exiting announce ->  gossip wait: " <> clump_id)
-        {:noreply, state}
+    # A node's oasis is written under its own public key. On a normal boot the
+    # local Baobab spool is empty, but peers may still hold this node's
+    # *previous* oasis logs (replicated before the last restart). If we started
+    # writing at sequence number 1 before those old logs came back, the
+    # late-arriving history would fork our log.
+    #
+    # Two ways out of the wait:
+    #   * fresh_announce  -> this is a brand-new identity, so no peer can hold
+    #                        our logs; safe to announce at sequence number 1.
+    #   * max_seqnum != 0 -> our own oasis logs have been gossiped back from the
+    #                        network, so we continue from the global max.
+    ready? = fresh_announce or Baobab.max_seqnum(pub, log_id: nli, clump_id: clump_id) != 0
 
-      _ ->
-        Process.send(self(), :announce, [])
-        Logger.info("Nicker exiting announce ->  ready: " <> clump_id)
-        {:noreply, Map.merge(state, %{public: Map.drop(public, [:wait_for_log])})}
+    if ready? do
+      Logger.info("Nicker exiting announce ->  ready: " <> clump_id)
+      Process.send(self(), :announce, [])
+      {:noreply, Map.merge(state, %{public: Map.drop(public, [:wait_for_log])})}
+    else
+      Logger.info("Nicker announce blocked waiting for own logs: " <> clump_id)
+      Process.send_after(self(), :announce, gossip_wait, [])
+      {:noreply, state}
     end
   end
 
@@ -92,7 +111,8 @@ defmodule Quagga.Nicker do
       op: Keyword.get(clump_def, :operator_key),
       pk: Baobab.Identity.create(id, sk),
       gw: Keyword.get(clump_def, :gossip_wait, {19, :minute}) |> Baby.Util.period_to_ms(),
-      af: Keyword.get(clump_def, :announce_freq, {24, :hour}) |> Baby.Util.period_to_ms()
+      af: Keyword.get(clump_def, :announce_freq, {24, :hour}) |> Baby.Util.period_to_ms(),
+      fresh: Keyword.get(clump_def, :fresh_announce, false)
     }
   end
 

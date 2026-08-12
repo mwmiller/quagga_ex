@@ -18,12 +18,31 @@ set -e
 #   fly secrets set DAZZLE_SECRET_KEY=... --app dazzle
 #   (plus the DNS mappings for *.zebrine.net)
 #
-# To deploy a single node instead, use ./deploy_latest <app>.
+# QUAGGA_FRESH_ANNOUNCE tells the Nicker whether this boot is a brand-new
+# identity (safe to announce at sequence number 1) or a recovered one (wait for
+# its old oasis logs to return from the peer, preventing a fork). The safe
+# default is "recovered"; pass --fresh only on the FIRST boot of a new
+# identity/key:
+#   ./deploy_all --fresh
+# Every later deploy / redeploy just runs ./deploy_all (no --fresh), and the
+# node pulls its old logs back before writing.
+#
+# To deploy a single node instead, use ./deploy_latest <app> [--fresh].
+
+FRESH=""
+for arg in "$@"; do
+  case "$arg" in
+    --fresh) FRESH="--env QUAGGA_FRESH_ANNOUNCE=1" ;;
+    *) echo "Unknown argument: $arg" >&2; exit 1 ;;
+  esac
+done
 
 git stash
 git fetch --prune origin
 git reset --hard origin/main
 git stash pop || true
 
-fly deploy --app quagga
-fly deploy --app dazzle
+# shellcheck disable=SC2086
+fly deploy --app quagga $FRESH
+# shellcheck disable=SC2086
+fly deploy --app dazzle $FRESH

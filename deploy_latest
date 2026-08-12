@@ -8,10 +8,28 @@ set -e
 #
 # The machine lands in the region its `baobab` volume was created in, so no
 # --region flag is needed/accepted by `fly deploy`.
-APP="${1:?usage: deploy_latest <app-name>   e.g. deploy_latest quagga}"
+#
+# QUAGGA_FRESH_ANNOUNCE tells the Nicker whether this boot is a brand-new
+# identity (safe to announce at sequence number 1) or a recovered one (wait for
+# its old oasis logs to return from the peer, preventing a fork). The safe
+# default is "recovered"; pass --fresh only on the FIRST boot of a new
+# identity/key:
+#   ./deploy_latest quagga --fresh
+APP="${1:?usage: deploy_latest <app-name> [--fresh]   e.g. deploy_latest quagga}"
+
+FRESH=""
+for arg in "$@"; do
+  case "$arg" in
+    --fresh) FRESH="--env QUAGGA_FRESH_ANNOUNCE=1" ;;
+    "$APP") ;;
+    *) echo "Unknown argument: $arg" >&2; exit 1 ;;
+  esac
+done
 
 git stash
 git fetch --prune origin
 git reset --hard origin/main
 git stash pop || true
-fly deploy --app "$APP"
+
+# shellcheck disable=SC2086
+fly deploy --app "$APP" $FRESH
