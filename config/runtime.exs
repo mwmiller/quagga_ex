@@ -43,7 +43,7 @@ node =
       %{
         identity: "dazzle",
         secret: System.get_env("DAZZLE_SECRET_KEY"),
-        name: "Dazzle ORD",
+        name: "Dazzle JNB",
         host: "dazzle.zebrine.net",
         facet_id: 1,
         cryouts: [
