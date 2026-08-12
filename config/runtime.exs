@@ -1,6 +1,20 @@
 import Config
 
-config :logger, level: :info
+# Log level is tunable at runtime via the LOG_LEVEL env var so it can be
+# flipped to :debug (and back to :info) without a code change. Set it with
+# `fly secrets set LOG_LEVEL=debug --app <app>` and redeploy.
+log_level =
+  case System.get_env("LOG_LEVEL", "info") do
+    "debug" -> :debug
+    "info" -> :info
+    l when l in ~w(warning warn) -> :warning
+    "error" -> :error
+    other ->
+      IO.warn("Unknown LOG_LEVEL #{inspect(other)}, defaulting to :info")
+      :info
+  end
+
+config :logger, level: log_level
 
 # The same codebase is deployed as two fly.io apps. fly.io sets
 # FLY_APP_NAME for each, so it selects this node's clump definition.
