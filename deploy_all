@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -e
+
+# Deploy BOTH nodes hosted by this repo, in one go:
+#
+#   quagga -> baobab volume in ord (USA / Chicago) -> quagga.zebrine.net
+#   dazzle -> baobab volume in jnb (Johannesburg)  -> dazzle.zebrine.net
+#
+# Each machine lands in the region its `baobab` volume was created in, so no
+# --region flag is needed/accepted by `fly deploy`.
+#
+# Prerequisites (handled once, on the fly.io side):
+#   fly apps create quagga
+#   fly apps create dazzle
+#   fly volumes create baobab --app quagga --region ord --size 10
+#   fly volumes create baobab --app dazzle --region jnb --size 10
+#   fly secrets set QUAGGA_SECRET_KEY=... --app quagga
+#   fly secrets set DAZZLE_SECRET_KEY=... --app dazzle
+#   (plus the DNS mappings for *.zebrine.net)
+#
+# To deploy a single node instead, use ./deploy_latest <app>.
+
+git stash
+git fetch --prune origin
+git reset --hard origin/main
+git stash pop || true
+
+fly deploy --app quagga
+fly deploy --app dazzle

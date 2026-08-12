@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 set -e
+
+# Deploy one of the two nodes hosted by this repo.
+#
+#   ./deploy_latest quagga  # -> ord (USA / Chicago), quagga.zebrine.net
+#   ./deploy_latest dazzle  # -> jnb (Johannesburg), dazzle.zebrine.net
+#
+# The machine lands in the region its `baobab` volume was created in, so no
+# --region flag is needed/accepted by `fly deploy`.
+APP="${1:?usage: deploy_latest <app-name>   e.g. deploy_latest quagga}"
+
 git stash
 git fetch --prune origin
 git reset --hard origin/main
-git stash pop
-fly deploy
-fly logs
+git stash pop || true
+fly deploy --app "$APP"

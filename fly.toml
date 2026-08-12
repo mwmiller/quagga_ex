@@ -1,18 +1,28 @@
-app = "quagga"
-primary_region = "ord"
+# This repo is deployed twice, as two separate fly.io apps, one per region:
+#   fly deploy --app quagga   # -> ord (USA / Chicago), backed by the `baobab` volume there
+#   fly deploy --app dazzle   # -> jnb (Johannesburg), backed by the `baobab` volume there
+#
+# `app` is intentionally omitted so one file serves both apps; pass it with
+# --app. The machine region is fixed by where each app's volume was created, so
+# no --region flag is needed (and fly deploy does not accept one).
+# The app learns which node to run from the FLY_APP_NAME env var (see
+# config/runtime.exs).
 
 kill_signal = "SIGTERM"
 kill_timeout = 5
 
-[env]
+# Persistent Baobab spool. Each app mounts its own app-scoped volume of this
+# name, created once per region (see deploy_all), e.g.:
+#   fly volumes create baobab --app quagga --region ord --size 10
+#   fly volumes create baobab --app dazzle --region jnb --size 10
+[mounts]
+  source = "baobab"
+  destination = "/data"
 
+# Baobab bamboo replication over raw TCP (not HTTP).
 [[services]]
   internal_port = 8483
   protocol = "tcp"
-
-  [services.concurrency]
-    hard_limit = 25
-    soft_limit = 20
 
   [[services.ports]]
     port = 8483
@@ -20,5 +30,10 @@ kill_timeout = 5
   [[services.tcp_checks]]
     grace_period = "30s" # allow some time for startup
     interval = "15s"
-    restart_limit = 6
     timeout = "2s"
+    restart_limit = 6
+
+[[vm]]
+  cpus = 2
+  cpu_kind = "shared"
+  memory = "4gb"

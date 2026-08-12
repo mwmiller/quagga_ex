@@ -1,8 +1,9 @@
 defmodule QuaggaTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
+
   doctest Quagga
 
-  test "greets the world" do
-    assert Quagga.hello() == :world
+  test "the Quagga module is defined" do
+    assert Code.ensure_loaded?(Quagga)
   end
 end

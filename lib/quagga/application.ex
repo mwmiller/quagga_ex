@@ -7,7 +7,7 @@ defmodule Quagga.Application do
   def start(_type, _args) do
     config = Application.get_all_env(:quagga)
 
-    nickers = define_nickers(Keyword.get(config, :clumps), [])
+    nickers = define_nickers(Keyword.get(config, :clumps, []), [])
     babies = [{Baby.Application, config}] ++ nickers
 
     # See https://hexdocs.pm/elixir/Supervisor.html
@@ -16,9 +16,10 @@ defmodule Quagga.Application do
     Supervisor.start_link(babies, opts)
   end
 
-  defp define_nickers([], acc), do: acc
+  @doc false
+  def define_nickers([], acc), do: acc
 
-  defp define_nickers([clump_def | rest], acc) do
+  def define_nickers([clump_def | rest], acc) do
     nicker = %{
       id: String.to_atom("quagga_nicker_" <> Keyword.get(clump_def, :id)),
       start: {Quagga.Nicker, :start_link, [clump_def]},

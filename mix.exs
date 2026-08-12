@@ -8,7 +8,8 @@ defmodule Quagga.MixProject do
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       releases: releases(),
-      deps: deps()
+      deps: deps(),
+      aliases: aliases()
     ]
   end
 
@@ -33,7 +34,18 @@ defmodule Quagga.MixProject do
   defp deps do
     [
       {:baby, "~> 0.32"},
-      {:quagga_def, ">= 0.0.0"}
+      {:quagga_def, ">= 0.0.0"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+    ]
+  end
+
+  defp aliases do
+    [
+      precommit: [
+        "format --check-formatted",
+        "credo --strict",
+        "compile --warnings-as-errors --force"
+      ]
     ]
   end
 end

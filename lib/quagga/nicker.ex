@@ -96,7 +96,8 @@ defmodule Quagga.Nicker do
     }
   end
 
-  defp fill_out_pubset(pubset, unpacked) do
+  @doc false
+  def fill_out_pubset(pubset, unpacked) do
     facet_id = Map.get(pubset, "facet_id", 0)
 
     pub =
