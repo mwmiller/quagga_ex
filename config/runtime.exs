@@ -24,6 +24,31 @@ log_level =
 
 config :logger, level: log_level
 
+# Baby connection tuning. These knobs are read from Application config at
+# connection startup, so they can be adjusted here and redeployed without a
+# code change. Spins are outbox intervals -- multiply by outrate to get
+# wall-clock time. The idle counter resets on any send or receive, so the
+# budgets measure consecutive silence on the link, not time on a busy one.
+#
+#   * outrate          ms between outbox ticks.
+#                      Default: random prime near 75.
+#   * max_spins        idle budget once the initial sync completes. A caught
+#                      up connection drops after this and reconnects on the
+#                      next cryout. Default: ~1193 (~95s at default outrate).
+#   * bootstrap_spins  idle budget while the initial sync is still running,
+#                      giving the peer time to compute its WANT list before
+#                      a stalled connection is dropped. Default: ~2969
+#                      (~4min at default outrate).
+#
+# Pinned values are used as-is; the commented block below shows how to set
+# generous, deterministic budgets. Leave it commented to use the jittered
+# library defaults.
+#
+# config :baby,
+#   outrate: 100,
+#   max_spins: 1500,
+#   bootstrap_spins: 5000
+
 # The same codebase is deployed as two fly.io apps. fly.io sets
 # FLY_APP_NAME for each, so it selects this node's clump definition.
 #
