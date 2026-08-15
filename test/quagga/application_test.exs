@@ -3,6 +3,34 @@ defmodule Quagga.ApplicationTest do
 
   alias Quagga.Application, as: App
 
+  describe "validate_clumps/1" do
+    test "accepts no clumps" do
+      assert App.validate_clumps([]) == :ok
+    end
+
+    test "accepts a well-formed 43-char base62 secret" do
+      clump = [id: "Quagga", controlling_secret: String.duplicate("a", 43)]
+      assert App.validate_clumps([clump]) == :ok
+    end
+
+    test "accepts a 32-byte raw secret" do
+      clump = [id: "Quagga", controlling_secret: <<0::size(256)>>]
+      assert App.validate_clumps([clump]) == :ok
+    end
+
+    test "rejects a missing secret" do
+      clump = [id: "Quagga"]
+      assert {:error, message} = App.validate_clumps([clump])
+      assert message =~ "controlling_secret"
+    end
+
+    test "rejects a malformed secret length" do
+      clump = [id: "Quagga", controlling_secret: "short"]
+      assert {:error, message} = App.validate_clumps([clump])
+      assert message =~ "controlling_secret"
+    end
+  end
+
   describe "define_nickers/2" do
     test "returns the accumulator unchanged for no clumps" do
       assert App.define_nickers([], []) == []

@@ -20,19 +20,39 @@ defmodule Quagga.Nicker do
 
   @impl true
   def handle_continue(:startup, %{public: pubset, clump_def: clump_def}) do
-    cd = unpack_clump_def(clump_def)
-    Logger.info("Nicker starting up: " <> cd[:cid])
-    public = fill_out_pubset(pubset, cd)
-    Process.send_after(self(), :announce, cd[:gw], [])
-    Logger.info("Nicker startup complete -> gossip wait: " <> cd[:cid])
+    case unpack_clump_def(clump_def) do
+      {:error, reason} ->
+        Logger.error("Nicker startup failed: " <> reason)
+        {:stop, reason, %{}}
 
-    {:noreply,
-     %{
-       public: public,
-       announce_freq: cd[:af],
-       gossip_wait: cd[:gw],
-       fresh_announce: cd[:fresh]
-     }}
+      {:ok, cd} ->
+        Logger.info("Nicker starting up: " <> cd[:cid])
+        public = fill_out_pubset(pubset, cd)
+
+        # Skip the gossip wait when the local spool already holds this key's
+        # oasis log (a warm boot on the persistent volume) or when this is a
+        # brand-new identity; only a cold recovery needs to wait for peers to
+        # gossip the old history back before writing.
+        first_check =
+          if cd[:fresh] or
+               Baobab.max_seqnum(cd[:pk], log_id: public["nicker_log_id"], clump_id: cd[:cid]) !=
+                 0 do
+            0
+          else
+            cd[:gw]
+          end
+
+        Process.send_after(self(), :announce, first_check, [])
+        Logger.info("Nicker startup complete -> gossip wait: " <> cd[:cid])
+
+        {:noreply,
+         %{
+           public: public,
+           announce_freq: cd[:af],
+           gossip_wait: cd[:gw],
+           fresh_announce: cd[:fresh]
+         }}
+    end
   end
 
   @impl true
@@ -62,9 +82,19 @@ defmodule Quagga.Nicker do
 
       # Our own logs have not yet gossiped back from the network.
       Baobab.max_seqnum(pk, log_id: nli, clump_id: clump_id) == 0 ->
-        Logger.info("Nicker announce blocked waiting for own logs: " <> clump_id)
+        rounds = Map.get(state, :wait_rounds, 0) + 1
+
+        if rounds == 3 do
+          Logger.warning(
+            "Nicker still waiting for its own oasis logs after #{rounds} rounds; " <>
+              "a peer must hold this key's log before it can announce again: " <> clump_id
+          )
+        else
+          Logger.info("Nicker announce blocked waiting for own logs: " <> clump_id)
+        end
+
         Process.send_after(self(), :announce, gossip_wait, [])
-        {:noreply, state}
+        {:noreply, Map.put(state, :wait_rounds, rounds)}
 
       # Our own logs are back, so we continue from the global max sequence
       # number. Hold the next announcement until it is due on the previous
@@ -95,6 +125,7 @@ defmodule Quagga.Nicker do
         :announce,
         %{
           announce_freq: announce_freq,
+          gossip_wait: gossip_wait,
           public:
             %{"identity" => id, "name" => name, "clump_id" => clump_id, "nicker_log_id" => nli} =
               public
@@ -102,39 +133,74 @@ defmodule Quagga.Nicker do
       ) do
     Logger.info("Nicker entering announce ready: " <> clump_id)
 
-    public
-    |> Map.drop(["identity", "nicker_log_id"])
-    |> Map.merge(%{"running" => "Etc/UTC" |> DateTime.now!() |> DateTime.to_string()})
-    |> CBOR.encode()
-    |> Baobab.append_log(id, log_id: nli, clump_id: clump_id)
+    result =
+      public
+      |> Map.drop(["identity", "nicker_log_id"])
+      |> Map.merge(%{"running" => "Etc/UTC" |> DateTime.now!() |> DateTime.to_string()})
+      |> CBOR.encode()
+      |> Baobab.append_log(id, log_id: nli, clump_id: clump_id)
 
-    Logger.info("Logged public announcement: " <> name)
+    case result do
+      %Baobab.Entry{} ->
+        Logger.info("Logged public announcement: " <> name)
+        Process.send_after(self(), :announce, announce_freq, [])
+        Logger.info("Nicker exiting announce ready -> announce_wait: " <> clump_id)
 
-    Process.send_after(self(), :announce, announce_freq, [])
-    Logger.info("Nicker exiting announce ready -> announce_wait: " <> clump_id)
+      error ->
+        Logger.error(
+          "Failed to log public announcement (will retry in #{div(gossip_wait, 1000)} s): " <>
+            inspect(error)
+        )
+
+        Process.send_after(self(), :announce, gossip_wait, [])
+    end
+
     {:noreply, state}
   end
 
   def handle_info(:announce, state) do
-    Logger.info("Nicker noop -> continue: ")
+    clump_id = get_in(state, [:public, "clump_id"]) || "unknown"
+    Logger.info("Nicker announce ignored (unexpected state): " <> clump_id)
     {:noreply, state}
   end
 
   defp unpack_clump_def(clump_def) do
-    sk = Keyword.get(clump_def, :controlling_secret)
     id = Keyword.get(clump_def, :controlling_identity)
+    sk = Keyword.get(clump_def, :controlling_secret)
 
-    %{
-      cid: Keyword.get(clump_def, :id),
-      port: Keyword.get(clump_def, :port),
-      id: id,
-      sk: sk,
-      op: Keyword.get(clump_def, :operator_key),
-      pk: Baobab.Identity.create(id, sk),
-      gw: Keyword.get(clump_def, :gossip_wait, {19, :minute}) |> Baby.Util.period_to_ms(),
-      af: Keyword.get(clump_def, :announce_freq, {24, :hour}) |> Baby.Util.period_to_ms(),
-      fresh: Keyword.get(clump_def, :fresh_announce, false)
-    }
+    with {:ok, sk} <- validate_secret(id, sk),
+         {:ok, pk} <- create_identity(id, sk) do
+      {:ok,
+       %{
+         cid: Keyword.get(clump_def, :id),
+         port: Keyword.get(clump_def, :port),
+         id: id,
+         sk: sk,
+         op: Keyword.get(clump_def, :operator_key),
+         pk: pk,
+         gw: Keyword.get(clump_def, :gossip_wait, {19, :minute}) |> Baby.Util.period_to_ms(),
+         af: Keyword.get(clump_def, :announce_freq, {24, :hour}) |> Baby.Util.period_to_ms(),
+         fresh: Keyword.get(clump_def, :fresh_announce, false)
+       }}
+    end
+  end
+
+  # A missing secret would silently generate a random identity (and thus a
+  # never-announcing node), so refuse to start on one.
+  defp validate_secret(_id, sk) when is_binary(sk) and byte_size(sk) in [32, 43],
+    do: {:ok, sk}
+
+  defp validate_secret(id, sk) when not is_binary(sk),
+    do: {:error, "controlling_secret for #{id} is not set"}
+
+  defp validate_secret(id, sk),
+    do: {:error, "controlling_secret for #{id} is malformed (#{byte_size(sk)} bytes)"}
+
+  defp create_identity(id, sk) do
+    case Baobab.Identity.create(id, sk) do
+      {:error, reason} -> {:error, "invalid controlling_secret for #{id}: #{inspect(reason)}"}
+      pk -> {:ok, pk}
+    end
   end
 
   @doc false
