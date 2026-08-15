@@ -86,4 +86,29 @@ defmodule Quagga.NickerTest do
       assert :error = Nicker.parse_running(42)
     end
   end
+
+  describe "address_changed?/2" do
+    test "is false when host and port are unchanged" do
+      pubset = %{"host" => "quagga.zebrine.net", "port" => 8483}
+      last = %{"host" => "quagga.zebrine.net", "port" => 8483}
+      refute Nicker.address_changed?(pubset, last)
+    end
+
+    test "is true when the host changed" do
+      pubset = %{"host" => "newhost.example.com", "port" => 8483}
+      last = %{"host" => "quagga.zebrine.net", "port" => 8483}
+      assert Nicker.address_changed?(pubset, last)
+    end
+
+    test "is true when the port changed" do
+      pubset = %{"host" => "quagga.zebrine.net", "port" => 9999}
+      last = %{"host" => "quagga.zebrine.net", "port" => 8483}
+      assert Nicker.address_changed?(pubset, last)
+    end
+
+    test "is true when a field is missing from either side" do
+      assert Nicker.address_changed?(%{"host" => "quagga.zebrine.net"}, %{"port" => 8483})
+      assert Nicker.address_changed?(%{}, %{"host" => "quagga.zebrine.net", "port" => 8483})
+    end
+  end
 end

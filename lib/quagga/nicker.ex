@@ -69,16 +69,22 @@ defmodule Quagga.Nicker do
       # Our own logs are back, so we continue from the global max sequence
       # number. Hold the next announcement until it is due on the previous
       # announcement's cadence, so a redeploy does not reannounce (and reset
-      # the schedule) ahead of time.
+      # the schedule) ahead of time -- unless the advertised address changed
+      # (e.g. the node moved), in which case the new address must go out
+      # immediately rather than waiting out the old cadence.
       true ->
-        delay = scheduled_delay(pk, nli, clump_id, announce_freq)
+        case next_announce_delay(public, pk, nli, clump_id, announce_freq) do
+          {:now, :address_changed} ->
+            Logger.info("Nicker announce address changed, announcing now: " <> clump_id)
+            Process.send(self(), :announce, [])
 
-        if delay > 0 do
-          Logger.info("Nicker next announce due in #{div(delay, 1000)} s: " <> clump_id)
-          Process.send_after(self(), :announce, delay, [])
-        else
-          Logger.info("Nicker exiting announce -> ready: " <> clump_id)
-          Process.send(self(), :announce, [])
+          {:now, _} ->
+            Logger.info("Nicker exiting announce -> ready: " <> clump_id)
+            Process.send(self(), :announce, [])
+
+          {:hold, delay} ->
+            Logger.info("Nicker next announce due in #{div(delay, 1000)} s: " <> clump_id)
+            Process.send_after(self(), :announce, delay, [])
         end
 
         {:noreply, Map.merge(state, %{public: Map.drop(public, [:wait_for_log])})}
@@ -152,17 +158,53 @@ defmodule Quagga.Nicker do
   end
 
   @doc false
-  # Milliseconds until the next announcement is due, based on the `running`
-  # timestamp of the most recent announcement. A non-positive result (or -1
-  # when the schedule cannot be determined) means an announcement is due
-  # immediately.
-  def scheduled_delay(pk, nli, clump_id, announce_freq) do
+  # The decoded CBOR map of this node's most recent announcement, or `:error`
+  # when it cannot be read (e.g. the log has not fully returned yet).
+  def last_announcement(pk, nli, clump_id) do
     with %Baobab.Entry{payload: payload} <-
            Baobab.log_entry(pk, :max, log_id: nli, clump_id: clump_id),
-         {:ok, %{"running" => running}, ""} <- CBOR.decode(payload),
-         {:ok, last} <- parse_running(running) do
-      announce_freq - DateTime.diff(DateTime.now!("Etc/UTC"), last, :millisecond)
+         {:ok, map, ""} <- CBOR.decode(payload) do
+      {:ok, map}
     else
+      _ -> :error
+    end
+  end
+
+  @doc false
+  # Whether the configured announcement pubset advertises a different address
+  # than the previous announcement. A missing field on either side counts as a
+  # change so nothing is silently advertised on stale data.
+  def address_changed?(pubset, last) do
+    Map.get(pubset, "host") != Map.get(last, "host") or
+      Map.get(pubset, "port") != Map.get(last, "port")
+  end
+
+  # Decide whether to announce now or hold to the cadence. An announcement is
+  # due immediately when the advertised address changed, when it is already
+  # past due, or when the previous announcement cannot be read. The address
+  # check comes first so a key that moved host/port does not respect the
+  # previous announcement's cadence.
+  defp next_announce_delay(public, pk, nli, clump_id, announce_freq) do
+    case last_announcement(pk, nli, clump_id) do
+      {:ok, last} ->
+        cond do
+          address_changed?(public, last) -> {:now, :address_changed}
+          cadence_delay(last, announce_freq) <= 0 -> {:now, :due}
+          true -> {:hold, cadence_delay(last, announce_freq)}
+        end
+
+      _ ->
+        {:now, :due}
+    end
+  end
+
+  @doc false
+  # Milliseconds until the next announcement is due, based on the `running`
+  # timestamp of a previous announcement. A non-positive result (or -1 when
+  # the timestamp cannot be parsed) means an announcement is due immediately.
+  def cadence_delay(last, announce_freq) do
+    case parse_running(Map.get(last, "running")) do
+      {:ok, last} -> announce_freq - DateTime.diff(DateTime.now!("Etc/UTC"), last, :millisecond)
       _ -> -1
     end
   end
