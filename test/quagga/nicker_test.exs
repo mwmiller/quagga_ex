@@ -64,4 +64,26 @@ defmodule Quagga.NickerTest do
       refute Map.has_key?(pub, "operator")
     end
   end
+
+  describe "parse_running/1" do
+    test "parses the space-separated DateTime.to_string/1 format" do
+      assert {:ok, dt} = Nicker.parse_running("2026-08-15 10:53:37.234567Z")
+      assert dt == ~U[2026-08-15 10:53:37.234567Z]
+    end
+
+    test "parses the ISO 8601 T-separated format" do
+      assert {:ok, dt} = Nicker.parse_running("2026-08-15T10:53:37.234567Z")
+      assert dt == ~U[2026-08-15 10:53:37.234567Z]
+    end
+
+    test "parses timestamps without fractional seconds" do
+      assert {:ok, dt} = Nicker.parse_running("2026-08-15 10:53:37Z")
+      assert dt == ~U[2026-08-15 10:53:37Z]
+    end
+
+    test "rejects garbage" do
+      assert :error = Nicker.parse_running("not a timestamp")
+      assert :error = Nicker.parse_running(42)
+    end
+  end
 end

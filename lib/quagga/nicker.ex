@@ -41,7 +41,8 @@ defmodule Quagga.Nicker do
         %{
           gossip_wait: gossip_wait,
           fresh_announce: fresh_announce,
-          public: %{:wait_for_log => pub, "clump_id" => clump_id, "nicker_log_id" => nli} = public
+          announce_freq: announce_freq,
+          public: %{:wait_for_log => pk, "clump_id" => clump_id, "nicker_log_id" => nli} = public
         } = state
       ) do
     Logger.info("Nicker entering announce gossip wait: " <> clump_id)
@@ -51,22 +52,36 @@ defmodule Quagga.Nicker do
     # *previous* oasis logs (replicated before the last restart). If we started
     # writing at sequence number 1 before those old logs came back, the
     # late-arriving history would fork our log.
-    #
-    # Two ways out of the wait:
-    #   * fresh_announce  -> this is a brand-new identity, so no peer can hold
-    #                        our logs; safe to announce at sequence number 1.
-    #   * max_seqnum != 0 -> our own oasis logs have been gossiped back from the
-    #                        network, so we continue from the global max.
-    ready? = fresh_announce or Baobab.max_seqnum(pub, log_id: nli, clump_id: clump_id) != 0
+    cond do
+      # Brand-new identity: no peer can hold our logs, so announce at
+      # sequence number 1 without waiting.
+      fresh_announce ->
+        Logger.info("Nicker exiting announce -> ready (fresh): " <> clump_id)
+        Process.send(self(), :announce, [])
+        {:noreply, Map.merge(state, %{public: Map.drop(public, [:wait_for_log])})}
 
-    if ready? do
-      Logger.info("Nicker exiting announce ->  ready: " <> clump_id)
-      Process.send(self(), :announce, [])
-      {:noreply, Map.merge(state, %{public: Map.drop(public, [:wait_for_log])})}
-    else
-      Logger.info("Nicker announce blocked waiting for own logs: " <> clump_id)
-      Process.send_after(self(), :announce, gossip_wait, [])
-      {:noreply, state}
+      # Our own logs have not yet gossiped back from the network.
+      Baobab.max_seqnum(pk, log_id: nli, clump_id: clump_id) == 0 ->
+        Logger.info("Nicker announce blocked waiting for own logs: " <> clump_id)
+        Process.send_after(self(), :announce, gossip_wait, [])
+        {:noreply, state}
+
+      # Our own logs are back, so we continue from the global max sequence
+      # number. Hold the next announcement until it is due on the previous
+      # announcement's cadence, so a redeploy does not reannounce (and reset
+      # the schedule) ahead of time.
+      true ->
+        delay = scheduled_delay(pk, nli, clump_id, announce_freq)
+
+        if delay > 0 do
+          Logger.info("Nicker next announce due in #{div(delay, 1000)} s: " <> clump_id)
+          Process.send_after(self(), :announce, delay, [])
+        else
+          Logger.info("Nicker exiting announce -> ready: " <> clump_id)
+          Process.send(self(), :announce, [])
+        end
+
+        {:noreply, Map.merge(state, %{public: Map.drop(public, [:wait_for_log])})}
     end
   end
 
@@ -135,4 +150,36 @@ defmodule Quagga.Nicker do
       key -> Map.merge(pub, %{"operator" => key})
     end
   end
+
+  @doc false
+  # Milliseconds until the next announcement is due, based on the `running`
+  # timestamp of the most recent announcement. A non-positive result (or -1
+  # when the schedule cannot be determined) means an announcement is due
+  # immediately.
+  def scheduled_delay(pk, nli, clump_id, announce_freq) do
+    with %Baobab.Entry{payload: payload} <-
+           Baobab.log_entry(pk, :max, log_id: nli, clump_id: clump_id),
+         {:ok, %{"running" => running}, ""} <- CBOR.decode(payload),
+         {:ok, last} <- parse_running(running) do
+      announce_freq - DateTime.diff(DateTime.now!("Etc/UTC"), last, :millisecond)
+    else
+      _ -> -1
+    end
+  end
+
+  @doc false
+  # Parse an announcement `running` timestamp. Newer entries are written with
+  # `DateTime.to_string/1` (space-separated), so normalise to ISO 8601 before
+  # parsing to also accept the "T" separator.
+  def parse_running(running) when is_binary(running) do
+    running
+    |> String.replace(" ", "T")
+    |> DateTime.from_iso8601()
+    |> case do
+      {:ok, dt, _} -> {:ok, dt}
+      _ -> :error
+    end
+  end
+
+  def parse_running(_), do: :error
 end
