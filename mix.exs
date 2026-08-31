@@ -33,7 +33,7 @@ defmodule Quagga.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:baby, "~> 0.40"},
+      {:baby, "~> 0.41"},
       {:quagga_def, ">= 0.0.0"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
